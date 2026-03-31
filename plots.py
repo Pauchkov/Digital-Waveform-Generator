@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 from matplotlib.patches import Wedge
+from pathlib import Path
+import ROOT
 
 
 RADIUS = 2.0
@@ -21,16 +23,33 @@ CHANNEL_ANGLES = [
 ]
 
 
-def plot_wom_channels(wom1_values, wom2_values, cmap_name='viridis', label = 'WOM Channel Values'):
+def save_hist3d_to_root(histogram, output_path, hist_name=None, mode="RECREATE"):
+    output_path = Path(output_path)
+    output_file = ROOT.TFile.Open(str(output_path), mode)
+    if not output_file or output_file.IsZombie():
+        raise OSError(f"Unable to open output ROOT file: {output_path}")
+
+    target_name = hist_name or histogram.GetName()
+    histogram_copy = histogram.Clone(target_name)
+    histogram_copy.SetDirectory(output_file)
+
+    output_file.cd()
+    written = histogram_copy.Write(target_name, ROOT.TObject.kOverwrite)
+    output_file.Close()
+
+    if written <= 0:
+        raise OSError(f"Unable to write histogram '{target_name}' to {output_path}")
+
+    return output_path
+
+
+def plot_wom_channels(wom1_values, wom2_values, cmap_name='plasma', label = 'WOM Channel Values'):
     if len(wom1_values) != 8 or len(wom2_values) != 8:
         raise ValueError('Expected 8 values for WOM1 and 8 values for WOM2')
 
     all_values = list(wom1_values) + list(wom2_values)
     vmin = min(all_values)
     vmax = max(all_values)
-    if vmin == vmax:
-        vmin -= 0.5
-        vmax += 0.5
 
     norm = Normalize(vmin=vmin, vmax=vmax)
     cmap = plt.get_cmap(cmap_name)
@@ -75,6 +94,16 @@ def plot_wom_channels(wom1_values, wom2_values, cmap_name='viridis', label = 'WO
 
     plt.suptitle(label)
 
-    plt.show()
+f = ROOT.TFile.Open("mutestfile.root")
+main_hist3D = f.Get("evt_quadrant_time")
+main_hist3D.SetDirectory(0)
+f.Close()
 
-plot_wom_channels([1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8], 'plasma', 'Example WOM Channel Values')
+
+save_hist3d_to_root(main_hist3D, "main_hist3D.root")
+
+
+if __name__ == "__main__":
+    plot_wom_channels([1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8], 'plasma', 'Example WOM Channel Values')
+    plot_wom_channels([1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8], 'plasma', 'Example WOM Channel Values 2')
+    plt.show()
